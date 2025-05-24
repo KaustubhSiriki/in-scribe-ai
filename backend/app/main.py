@@ -299,13 +299,27 @@ async def upload_and_process_pdf(
     if file.content_type != "application/pdf":
         raise HTTPException(400, "Invalid file type. Only PDFs allowed.")
 
+    supabase = get_supabase_admin_client()
+    
+    # --- USAGE LIMIT LOGIC: Check "profiles" table ---
+    profile_res = supabase.table("profiles").select("free_uses").eq("id", user_id).maybe_single().execute()
+    if not profile_res.data:
+        # New user - create a new row with free_uses = 0
+        supabase.table("profiles").insert({"id": user_id, "free_uses": 0}).execute()
+        free_uses = 0
+    else:
+        free_uses = profile_res.data.get("free_uses", 0)
+    
+    if free_uses >= 2:
+        raise HTTPException(403, detail="Free usage limit reached. Please contact us for more access.")
+
+    # --- PDF UPLOAD HANDLING ---
     document_db_id = str(uuid.uuid4())
     safe_name = f"{document_db_id}_{file.filename}"
     file_path = os.path.join(TEMP_UPLOAD_DIR, safe_name)
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
-    supabase = get_supabase_admin_client()
     doc_meta = {
         "id": document_db_id,
         "user_id": user_id,
@@ -314,6 +328,9 @@ async def upload_and_process_pdf(
     }
     res = supabase.table("documents").insert(doc_meta).execute()
     handle_supabase_response(res, "create_document")
+
+    # Increment the user's free_uses count
+    supabase.table("profiles").update({"free_uses": free_uses + 1}).eq("id", user_id).execute()
 
     background_tasks.add_task(
         process_document_and_store_analysis,
@@ -328,7 +345,7 @@ async def upload_and_process_pdf(
         message="Uploaded successfully; processing started.",
         file_name=file.filename,
     )
-
+    
 @app.get("/analysis-status/{document_db_id}", response_model=AnalysisStatusResponse)
 async def get_analysis_status(document_db_id: str, response: Response):
     # Prevent caching so clients always get the latest status and summary

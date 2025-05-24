@@ -440,7 +440,7 @@ export default function DocumentDetailPage() {
                 <div
                   ref={chatContainerRef}
                   className="flex-1 overflow-y-auto custom-scrollbar mb-4 prose prose-invert"
-                  style={{ minHeight: "300px" }}
+                  style={{ minHeight: "300px", maxHeight: "400px" }}
                 >
                   {chatMessages.length === 0 && <EmptyChatSVG />}
                   {chatMessages.map((msg) => (
