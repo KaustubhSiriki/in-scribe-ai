@@ -93,3 +93,8 @@ body {
   background: var(--color-text-secondary);
   border-radius: 10px;
 }
+
+button:focus, input:focus {
+  outline: 2px solid var(--color-accent-primary);
+  outline-offset: 2px;
+}

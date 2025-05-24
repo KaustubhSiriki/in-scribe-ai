@@ -5,17 +5,7 @@ import { Button } from "@/components/ui/Button";
 
 export default function HomePage() {
   return (
-    <main className="relative flex flex-col items-center justify-center min-h-screen overflow-hidden bg-hero-gradient text-text-primary dark:text-text-primary">
-      {/* Dots pattern overlay */}
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          backgroundImage: "url('/images/pattern-dots.svg')",
-          opacity: 0.09,
-          backgroundRepeat: "repeat",
-        }}
-      ></div>
-
+    <main className="relative flex flex-col items-center justify-center min-h-screen overflow-hidden text-text-primary dark:text-text-primary">
       <div className="relative z-10 max-w-3xl px-6 text-center space-y-6">
         <span className="inline-block bg-accent-primary/10 text-accent-primary px-3 py-1 rounded-full font-medium">
           ✨ AI-Powered Document Analysis
@@ -35,7 +25,7 @@ export default function HomePage() {
             <Button> Get Started </Button>
           </a>
           <a
-            href="/demo"
+            href="/dashboard"
             className="inline-block px-8 py-4 rounded-lg font-semibold text-accent-primary hover:text-accent-secondary transition text-lg"
           >
             View Demo →

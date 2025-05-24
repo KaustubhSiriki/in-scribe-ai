@@ -266,224 +266,260 @@ export default function DocumentDetailPage() {
     );
 
   return (
-
-      <div className="container mx-auto py-10 px-2 sm:px-4 max-w-5xl">
-        {/* Notification Snackbar */}
-        <AnimatePresence>
-          {notification && (
-            <motion.div
-              initial={{ opacity: 0, y: -24 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -24 }}
-              className={`fixed left-1/2 top-6 z-[9999] transform -translate-x-1/2 px-6 py-4 rounded-2xl shadow-xl font-medium
-              ${notification.type === "success" ? "bg-success text-white" : "bg-error text-white"}`}
-            >
-              {notification.message}
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Rename Modal */}
-        <AnimatePresence>
-          {showRenameModal && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[999] bg-black/60 flex items-center justify-center"
-            >
-              <motion.div
-                initial={{ scale: 0.95 }}
-                animate={{ scale: 1 }}
-                exit={{ scale: 0.95 }}
-                className="bg-surface rounded-3xl p-8 shadow-2xl w-full max-w-sm"
-              >
-                <h2 className="font-bold text-xl mb-4">Rename Document</h2>
-                <input
-                  className="w-full p-3 rounded-xl border border-text-secondary/20 bg-surface-alt text-text-primary mb-4"
-                  value={renameValue}
-                  onChange={e => setRenameValue(e.target.value)}
-                  placeholder="New document name"
-                />
-                <div className="flex gap-4 justify-end">
-                  <Button variant="secondary" onClick={() => setShowRenameModal(false)}>
-                    Cancel
-                  </Button>
-                  <Button onClick={handleRename}>Save</Button>
-                </div>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        <Link
-          href="/dashboard"
-          className="inline-flex items-center text-sm text-accent-primary hover:text-accent-secondary mb-6 group transition"
-        >
-          <ArrowLeftIcon className="h-4 w-4 mr-2 group-hover:-translate-x-1 transition-transform" />
-          Back to Dashboard
-        </Link>
-
-        <div className="flex flex-col lg:flex-row gap-8 min-h-[450px]">
-          {/* Left: Summary */}
+  
+    <div className="relative min-h-screen flex flex-col bg-hero-gradient">
+      {/* Notification Snackbar */}
+      <AnimatePresence>
+        {notification && (
           <motion.div
-            initial={{ opacity: 0, y: 36 }}
+            initial={{ opacity: 0, y: -24 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.65, type: "spring" }}
-            className="flex-1 min-w-[320px]"
+            exit={{ opacity: 0, y: -24 }}
+            className={`fixed left-1/2 top-6 z-[9999] transform -translate-x-1/2 px-6 py-4 rounded-2xl shadow-xl font-medium
+            ${notification.type === "success" ? "bg-success text-white" : "bg-error text-white"}`}
           >
-            <div
-              className="relative bg-gradient-to-br from-surface via-surface-alt to-surface-alt shadow-xl rounded-3xl p-6 lg:p-8 transition-colors duration-300 flex flex-col"
-              style={{
-                boxShadow:
-                  "0 4px 40px 0 rgba(80,80,180,0.14), 0 1.5px 6px 0 rgba(20,20,70,0.04)",
-              }}
-            >
-              {/* Quick actions menu */}
-              <div className="absolute right-5 top-5 z-10">
-                <div className="relative">
-                  <button
-                    className="p-2 rounded-full hover:bg-accent-primary/10 transition"
-                    onClick={() => setShowActions((v) => !v)}
-                    aria-label="Document actions"
-                  >
-                    <MoreVertical size={20} />
-                  </button>
-                  <AnimatePresence>
-                    {showActions && (
-                      <motion.div
-                        initial={{ opacity: 0, scale: 0.97, y: 8 }}
-                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.97, y: 8 }}
-                        className="absolute right-0 mt-2 bg-surface-alt rounded-xl shadow-lg border border-text-secondary/10 min-w-[140px] py-1 z-20"
-                      >
-                        <button
-                          className="flex items-center gap-2 w-full px-4 py-2 text-sm hover:bg-accent-primary/10 transition text-text-primary"
-                          onClick={() => {
-                            setShowRenameModal(true);
-                            setRenameValue(documentDetails.original_file_name ?? "");
-                            setShowActions(false);
-                          }}
-                        >
-                          <Pencil size={15} /> Rename
-                        </button>
-                        <button
-                          className="flex items-center gap-2 w-full px-4 py-2 text-sm hover:bg-error/10 transition text-error"
-                          onClick={() => {
-                            setShowActions(false);
-                            handleDelete();
-                          }}
-                        >
-                          <Trash size={15} /> Delete
-                        </button>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              </div>
-              <h1 className="text-2xl font-bold text-text-primary mb-2 break-all pr-8">{documentDetails.original_file_name}</h1>
-              <p className="text-xs text-text-secondary mb-2">
-                Uploaded: {documentDetails.created_at ? new Date(documentDetails.created_at).toLocaleString() : "N/A"}
-                <span className={`ml-2 font-medium
-                  ${documentDetails.status === "completed"
-                    ? "text-success"
-                    : "text-accent-primary"}`}>
-                  Status: {documentDetails.status.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}
-                </span>
-              </p>
-              {/* SCROLLABLE SUMMARY */}
-              {documentDetails.summary_short && (
-                <div className="prose prose-invert max-w-none mb-6 bg-surface-alt rounded-2xl p-4 custom-scrollbar"
-                    style={{overflowY: "auto", height: "45vh"}}>
-                  <h2 className="text-base font-semibold text-text-primary mb-1">Summary</h2>
-                  <p>{documentDetails.summary_short}</p>
-                </div>
-              )}
-              {documentDetails.error_message && (
-                <div className="mb-6 p-3 text-sm text-error bg-error/10 border border-error/30 rounded-xl">
-                  <strong>Processing Error:</strong> {documentDetails.error_message}
-                </div>
-              )}
-            </div>
+            {notification.message}
           </motion.div>
+        )}
+      </AnimatePresence>
 
-          {/* Right: Chat */}
+      {/* Rename Modal */}
+      <AnimatePresence>
+        {showRenameModal && (
           <motion.div
-            initial={{ opacity: 0, y: 48 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, type: "spring" }}
-            className="flex-[1.3] min-w-[320px] max-w-xl flex flex-col"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[999] bg-black/60 flex items-center justify-center"
           >
-            <div
-              className="bg-gradient-to-br from-surface-alt to-surface shadow-xl rounded-3xl p-6 flex-1 flex flex-col transition-colors duration-300"
-              style={{
-                boxShadow:
-                  "0 4px 32px 0 rgba(80,80,180,0.12), 0 1.5px 4px 0 rgba(20,20,70,0.02)",
-              }}
+            <motion.div
+              initial={{ scale: 0.95 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.95 }}
+              className="bg-surface rounded-3xl p-8 shadow-2xl w-full max-w-sm"
             >
-              <h2 className="text-xl font-semibold mb-4 text-text-primary">Chat with this Document</h2>
-              {/* Chat list area */}
-              <div
-                ref={chatContainerRef}
-                className="flex-1 overflow-y-auto custom-scrollbar mb-3 prose prose-invert"
-                style={{ minHeight: 260, maxHeight: 380 }}
-              >
-                {chatMessages.length === 0 && <EmptyChatSVG />}
-                {chatMessages.map((msg) => (
-                  <motion.div
-                    key={msg.id}
-                    initial={{ opacity: 0, y: 16 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className={`flex flex-col my-1 ${msg.sender === "user" ? "items-end" : "items-start"}`}
-                  >
-                    <div className={msg.sender === "user" ? userBubble : aiBubble}>
-                      {msg.text.split("\n").map((line, i) => (
-                        <p key={i}>{line}</p>
-                      ))}
-                    </div>
-                    <span className="text-xs text-text-secondary mt-1 px-1">
-                      {msg.sender === "user" ? "You" : "InScribe AI"} – {msg.timestamp.toLocaleTimeString()}
-                    </span>
-                  </motion.div>
-                ))}
-              </div>
-              {/* Chat input is always pinned to bottom */}
-              <form
-                onSubmit={handleQuerySubmit}
-                className="flex items-center gap-2 pt-2 border-t border-text-secondary/15 mt-auto"
-              >
-                <input
-                  type="text"
-                  value={userQuery}
-                  onChange={e => setUserQuery(e.target.value)}
-                  placeholder="Ask a question…"
-                  className="flex-grow px-4 py-3 bg-surface-alt rounded-xl border border-text-secondary/20 text-text-primary focus:ring-2 focus:ring-accent-primary outline-none"
-                  disabled={isQuerying || !documentDetails.qna_ready}
-                />
-                <Button
-                  type="submit"
-                  disabled={isQuerying || !userQuery.trim() || !documentDetails.qna_ready}
-                  className="px-6 py-3"
-                >
-                  {isQuerying ? (
-                    <svg className="animate-spin h-4 w-4" viewBox="0 0 20 20">
-                      <circle cx="10" cy="10" r="8" stroke="white" strokeWidth="3" fill="none" />
-                    </svg>
-                  ) : "Ask"}
+              <h2 className="font-bold text-xl mb-4">Rename Document</h2>
+              <input
+                className="w-full p-3 rounded-xl border border-text-secondary/20 bg-surface-alt text-text-primary mb-4"
+                value={renameValue}
+                onChange={e => setRenameValue(e.target.value)}
+                placeholder="New document name"
+              />
+              <div className="flex gap-4 justify-end">
+                <Button variant="secondary" onClick={() => setShowRenameModal(false)}>
+                  Cancel
                 </Button>
-              </form>
-              {queryError && (
-                <motion.p
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="text-sm text-error mt-2"
-                >
-                  {queryError}
-                </motion.p>
-              )}
-            </div>
+                <Button onClick={handleRename}>Save</Button>
+              </div>
+            </motion.div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Main Content Container */}
+      <div className="flex-1 flex flex-col justify-center items-center px-4 py-8 z-10">
+        <div className="w-full max-w-7xl">
+          {/* Back Button */}
+          <Link
+            href="/dashboard"
+            className="inline-flex items-center text-sm text-white dark:text-accent-secondary hover:text-accent-secondary mb-6 group transition"
+          >
+            <ArrowLeftIcon className="h-4 w-4 mr-2 group-hover:-translate-x-1 transition-transform" />
+            Back to Dashboard
+          </Link>
+
+          {/* Main Content Grid */}
+          <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 xl:gap-12 items-stretch">
+            {/* Left: Summary */}
+            <motion.div
+              initial={{ opacity: 0, y: 36 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.65, type: "spring" }}
+              className="w-full lg:w-1/2 flex flex-col"
+            >
+              <div
+                className="relative bg-gradient-to-br from-surface via-surface-alt to-surface-alt shadow-xl rounded-3xl p-6 lg:p-8 flex flex-col h-full transition-colors duration-300"
+                style={{
+                  boxShadow:
+                    "0 4px 40px 0 rgba(80,80,180,0.14), 0 1.5px 6px 0 rgba(20,20,70,0.04)",
+                  minHeight: "500px",
+                }}
+              >
+                {/* Quick actions menu */}
+                <div className="absolute right-5 top-5 z-10">
+                  <div className="relative">
+                    <button
+                      className="p-2 rounded-full hover:bg-accent-primary/10 transition"
+                      onClick={() => setShowActions((v) => !v)}
+                      aria-label="Document actions"
+                    >
+                      <MoreVertical size={20} />
+                    </button>
+                    <AnimatePresence>
+                      {showActions && (
+                        <motion.div
+                          initial={{ opacity: 0, scale: 0.97, y: 8 }}
+                          animate={{ opacity: 1, scale: 1, y: 0 }}
+                          exit={{ opacity: 0, scale: 0.97, y: 8 }}
+                          className="absolute right-0 mt-2 bg-surface-alt rounded-xl shadow-lg border border-text-secondary/10 min-w-[140px] py-1 z-20"
+                        >
+                          <button
+                            className="flex items-center gap-2 w-full px-4 py-2 text-sm hover:bg-accent-primary/10 transition text-text-primary"
+                            onClick={() => {
+                              setShowRenameModal(true);
+                              setRenameValue(documentDetails.original_file_name ?? "");
+                              setShowActions(false);
+                            }}
+                          >
+                            <Pencil size={15} /> Rename
+                          </button>
+                          <button
+                            className="flex items-center gap-2 w-full px-4 py-2 text-sm hover:bg-error/10 transition text-error"
+                            onClick={() => {
+                              setShowActions(false);
+                              handleDelete();
+                            }}
+                          >
+                            <Trash size={15} /> Delete
+                          </button>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                </div>
+
+                <h1 className="text-2xl font-bold text-text-primary mb-2 break-all pr-8">{documentDetails.original_file_name}</h1>
+                <p className="text-xs text-text-secondary mb-4">
+                  Uploaded: {documentDetails.created_at ? new Date(documentDetails.created_at).toLocaleString() : "N/A"}
+                  <span className={`ml-2 font-medium
+                    ${documentDetails.status === "completed"
+                      ? "text-success"
+                      : "text-accent-primary"}`}>
+                    Status: {documentDetails.status.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}
+                  </span>
+                </p>
+
+                {/* SCROLLABLE SUMMARY */}
+                {documentDetails.summary_short && (
+                  <div className="prose prose-invert max-w-none mb-6 bg-surface-alt rounded-2xl p-4 custom-scrollbar flex-1"
+                    style={{
+                      overflowY: "auto",
+                      minHeight: "200px",
+                    }}>
+                    <h2 className="text-base font-semibold text-text-primary mb-2">Summary</h2>
+                    <p className="text-text-primary">{documentDetails.summary_short}</p>
+                  </div>
+                )}
+
+                {documentDetails.error_message && (
+                  <div className="mb-6 p-3 text-sm text-error bg-error/10 border border-error/30 rounded-xl">
+                    <strong>Processing Error:</strong> {documentDetails.error_message}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+
+            {/* Right: Chat */}
+            <motion.div
+              initial={{ opacity: 0, y: 48 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, type: "spring" }}
+              className="w-full lg:w-1/2 flex flex-col"
+            >
+              <div
+                className="bg-gradient-to-br from-surface-alt to-surface shadow-xl rounded-3xl p-6 flex flex-col h-full transition-colors duration-300"
+                style={{
+                  boxShadow:
+                    "0 4px 32px 0 rgba(80,80,180,0.12), 0 1.5px 4px 0 rgba(20,20,70,0.02)",
+                  minHeight: "500px",
+                }}
+              >
+                <h2 className="text-xl font-semibold mb-4 text-text-primary">Chat with this Document</h2>
+                
+                {/* Chat list area */}
+                <div
+                  ref={chatContainerRef}
+                  className="flex-1 overflow-y-auto custom-scrollbar mb-4 prose prose-invert"
+                  style={{ minHeight: "300px" }}
+                >
+                  {chatMessages.length === 0 && <EmptyChatSVG />}
+                  {chatMessages.map((msg) => (
+                    <motion.div
+                      key={msg.id}
+                      initial={{ opacity: 0, y: 16 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className={`flex flex-col my-2 ${msg.sender === "user" ? "items-end" : "items-start"}`}
+                    >
+                      <div className={msg.sender === "user" ? userBubble : aiBubble}>
+                        {msg.text.split("\n").map((line, i) => (
+                          <p key={i} className="m-0">{line}</p>
+                        ))}
+                      </div>
+                      <span className="text-xs text-text-secondary mt-1 px-1">
+                        {msg.sender === "user" ? "You" : "InScribe AI"} – {msg.timestamp.toLocaleTimeString()}
+                      </span>
+                    </motion.div>
+                  ))}
+                </div>
+
+                {/* Chat input pinned to bottom */}
+                <form
+                  onSubmit={handleQuerySubmit}
+                  className="flex items-center gap-3 pt-4 border-t border-text-secondary/15 mt-auto"
+                >
+                  <input
+                    type="text"
+                    value={userQuery}
+                    onChange={e => setUserQuery(e.target.value)}
+                    placeholder="Ask a question…"
+                    className="flex-grow px-4 py-3 bg-surface-alt rounded-xl border border-text-secondary/20 text-text-primary focus:ring-2 focus:ring-accent-primary outline-none"
+                    disabled={isQuerying || !documentDetails.qna_ready}
+                  />
+                  <Button
+                    type="submit"
+                    disabled={isQuerying || !userQuery.trim() || !documentDetails.qna_ready}
+                    className="px-6 py-3"
+                  >
+                    {isQuerying ? (
+                      <svg className="animate-spin h-4 w-4" viewBox="0 0 20 20">
+                        <circle cx="10" cy="10" r="8" stroke="white" strokeWidth="3" fill="none" />
+                      </svg>
+                    ) : "Ask"}
+                  </Button>
+                </form>
+
+                {queryError && (
+                  <motion.p
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="text-sm text-error mt-2"
+                  >
+                    {queryError}
+                  </motion.p>
+                )}
+              </div>
+            </motion.div>
+          </div>
         </div>
       </div>
+
+      {/* Gradient bg on lowest layer */}
+      <div
+        className="absolute inset-0 z-0 pointer-events-none"
+        aria-hidden="true"
+        style={{
+          background:
+            "radial-gradient(circle at 60% 42%, var(--gradient-hero-start, #eceafe) 0%, var(--gradient-hero-end, #f8f9fb) 100%)",
+        }}
+      />
+      <div
+        className="absolute inset-0 z-0 pointer-events-none dark:block hidden"
+        aria-hidden="true"
+        style={{
+          background:
+            "radial-gradient(circle at 60% 42%, var(--gradient-hero-start-dark, #2c256f) 0%, var(--gradient-hero-end-dark, #10111a) 100%)",
+        }}
+      />
+    </div>
   );
 }
