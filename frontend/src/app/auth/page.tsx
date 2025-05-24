@@ -1,31 +1,32 @@
-'use client';
-import { useEffect } from 'react';
-import { Auth } from '@supabase/auth-ui-react';
-import { ThemeSupa } from '@supabase/auth-ui-shared';
-import { useRouter } from 'next/navigation';
-import { useSupabase } from '@/app/supabase-provider';
+"use client";
+import { useEffect } from "react";
+import { Auth } from "@supabase/auth-ui-react";
+import { ThemeSupa } from "@supabase/auth-ui-shared";
+import { useRouter } from "next/navigation";
+import { useSupabase } from "@/app/supabase-provider";
 
 export default function AuthPage() {
   const { supabase, session } = useSupabase();
   const router = useRouter();
 
-
   useEffect(() => {
     if (session) {
-      router.push('/dashboard');
+      router.push("/dashboard");
     }
   }, [session, router]);
 
-
   if (!supabase) {
-    return <div className="flex justify-center items-center min-h-screen">Loading authentication...</div>;
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        Loading authentication...
+      </div>
+    );
   }
-  
 
   return (
-    <div className='flex justify-center items-center min-h-screen bg-background'>
-      <div className='w-full max-w-md p-8 space-y-8 bg-surface rounded-lg shadow-xl border border-black/5 dark:border-white/10'>
-        <h2 className='mt-6 text-center text-3xl font-extrabold text-text-primary'>
+    <div className="flex justify-center items-center min-h-screen bg-background">
+      <div className="w-full max-w-md p-8 space-y-8 bg-surface rounded-lg shadow-xl border border-black/5 dark:border-white/10">
+        <h2 className="mt-6 text-center text-3xl font-extrabold text-text-primary">
           Sign in to InScribe AI
         </h2>
         {/* 
@@ -44,28 +45,33 @@ export default function AuthPage() {
             variables: {
               default: {
                 colors: {
-                  brand: 'hsl(252 75% 60%)',
-                  brandAccent: 'hsl(252 85% 65%)',
-                  inputBorder: 'hsl(252 75% 60%)',
-                  inputText: 'var(--color-text-primary)',
+                  brand: "hsl(252 75% 60%)",
+                  brandAccent: "hsl(252 85% 65%)",
+                  inputBorder: "hsl(252 75% 60%)",
+                  inputText: "var(--color-text-primary)",
                 },
               },
             },
           }}
-          providers={['google']}
+          providers={["google"]}
+          redirectTo={
+            typeof window !== "undefined"
+              ? `${window.location.origin}/dashboard`
+              : undefined
+          }
           localization={{
             variables: {
               sign_in: {
-                email_label: 'Email address',
-                password_label: 'Password',
+                email_label: "Email address",
+                password_label: "Password",
               },
               sign_up: {
-                email_label: 'Email address',
-                password_label: 'Create a password',
-              }
-            }
+                email_label: "Email address",
+                password_label: "Create a password",
+              },
+            },
           }}
-          theme='light'
+          theme="light"
         />
       </div>
     </div>

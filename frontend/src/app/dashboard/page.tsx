@@ -311,7 +311,7 @@ export default function DashboardPage() {
             <div
               className={`
           relative w-fit items-center justify-center left-1/2 transform -translate-x-1/2 z-50 
-          px-6 py-3 rounded-lg shadow-lg transition my-7 backdrop-blur-lg
+          px-6 py-3 rounded-lg shadow-lg transition my-7 backdrop-blur-lg border-white/50 border
           ${
             freeUses < 2
               ? "bg-accent-primary/90 text-black dark:text-white"
@@ -320,7 +320,7 @@ export default function DashboardPage() {
         `}
             >
               {freeUses < 2
-                ? `You have ${2 - freeUses} free analyses remaining.`
+                ? `You have ${2 - freeUses} free analyses remaining`
                 : "You've reached your free limit. Contact us for more access."}
             </div>
           )}

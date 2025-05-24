@@ -10,7 +10,7 @@ export const metadata: Metadata = {
   title: "InScribe AI",
   description: "Intelligent Document Analysis",
   icons: {
-    icon: "/quill.png",
+    icon: "/favicon.png",
   },
 };
 
@@ -21,6 +21,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={inter.className}>
+      <link rel="icon" href="/favicon.png" sizes="any" />
       <body>
         <SupabaseProvider>
           <ThemeProvider>{children}</ThemeProvider>
