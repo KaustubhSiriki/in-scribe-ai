@@ -65,7 +65,7 @@ export default function AuthPage() {
               }
             }
           }}
-          theme='dark'
+          theme='light'
         />
       </div>
     </div>

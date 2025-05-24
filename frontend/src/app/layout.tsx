@@ -9,6 +9,9 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "InScribe AI",
   description: "Intelligent Document Analysis",
+  icons: {
+    icon: "/quill.png",
+  },
 };
 
 export default function RootLayout({
