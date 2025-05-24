@@ -1,64 +1,21 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useSupabase } from "@/app/supabase-provider";
 import PdfUploader from "@/components/documents/PdfUploader";
-import { SupabaseClient, Session, PostgrestError } from "@supabase/supabase-js"; // Import types
+import { MoreVertical, Trash, Pencil } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { motion, AnimatePresence } from "framer-motion";
 
-// Matches ProcessInitiationResponse from backend
-interface ProcessInitiationResponse {
+interface DashboardDocument {
   document_db_id: string;
-  message: string;
-  file_name: string;
-  num_pages: number;
-}
-
-// Matches AnalysisResultResponse from backend for status polling
-interface AnalysisPollResult {
-  document_db_id: string;
+  original_file_name: string;
   status: string;
   summary_short?: string | null;
   key_findings?: string[] | null;
   error_message?: string | null;
-  original_file_name?: string; // Added by frontend for display
-}
-
-// Represents a document as stored in or retrieved from Supabase 'documents' table
-interface DocumentFromDB {
-  id: string; // This is document_db_id
-  user_id: string;
-  file_name: string;
-  file_size_bytes: number | null;
-  mime_type: string | null;
-  processing_status: string;
-  error_message: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-// Represents an analysis as stored in or retrieved from Supabase 'document_analyses' table
-interface AnalysisFromDB {
-  id: string;
-  document_id: string;
-  user_id: string;
-  llm_model_used: string | null;
-  summary_short: string | null;
-  key_findings: any | null; // JSONB, can be array of strings or objects
-  qna_ready: boolean;
-  created_at: string;
-}
-
-// Extended state for documents on the dashboard
-interface DashboardDocument {
-  document_db_id: string; // from documents.id
-  original_file_name: string; // from documents.file_name
-  status: string; // from documents.processing_status or derived from polling
-  summary_short?: string | null; // from document_analyses.summary_short
-  key_findings?: string[] | null; // from document_analyses.key_findings (simplified)
-  error_message?: string | null; // from documents.error_message or polling
-  created_at?: string; // from documents.created_at
+  created_at?: string;
   isPolling?: boolean;
   pollingAttempts?: number;
 }
@@ -67,502 +24,437 @@ const POLLING_INTERVAL = 5000;
 const MAX_POLLING_ATTEMPTS = 24;
 
 export default function DashboardPage() {
-  const { session, supabase } = useSupabase() as {
-    session: Session | null;
-    supabase: SupabaseClient | null;
-  };
-  const router = useRouter();
-
+  const { session, supabase } = useSupabase();
   const [documents, setDocuments] = useState<DashboardDocument[]>([]);
   const [isLoadingInitialDocs, setIsLoadingInitialDocs] = useState(true);
   const [initialDocsError, setInitialDocsError] = useState<string | null>(null);
 
-  // --- Effect for Initial Document Fetch ---
+  // Actions & Modal states
+  const [showActionsIdx, setShowActionsIdx] = useState<number | null>(null);
+  const [showRenameModalIdx, setShowRenameModalIdx] = useState<number | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [notification, setNotification] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [showDeleteModalIdx, setShowDeleteModalIdx] = useState<number | null>(null);
+
+  // --- Initial fetch
   useEffect(() => {
-    console.log(
-      "DashboardPage: Auth check & Initial Docs Fetch effect running. Session:",
-      session ? "Exists" : "Null",
-      "Supabase:",
-      supabase ? "Exists" : "Null",
-      "LoadingInitial:",
-      isLoadingInitialDocs
-    );
-
-    if (supabase && !session && !isLoadingInitialDocs) {
-      console.log(
-        "DashboardPage: No session after initial load attempt, redirecting to /auth"
-      );
-      router.push("/auth");
-      return; // Exit effect early
-    }
-
-    if (session && supabase && isLoadingInitialDocs) {
-      console.log(
-        "DashboardPage: Session available, fetching initial documents from Supabase."
-      );
-
+    if (supabase && session && isLoadingInitialDocs) {
       const fetchUserDocuments = async () => {
         try {
-          // Fetch documents for the current user, ordered by creation date
           const { data: userDocuments, error: docError } = await supabase
             .from("documents")
-            .select("*") // Select all columns from documents table
+            .select("*")
             .eq("user_id", session.user.id)
             .order("created_at", { ascending: false });
+          if (docError) throw docError;
 
-          if (docError) {
-            console.error("DashboardPage: Error fetching documents:", docError);
-            setInitialDocsError(
-              "Failed to load your documents. Please try again."
-            );
-            throw docError; // Propagate error to stop further processing in this try block
-          }
-
-          if (userDocuments) {
-            console.log(
-              "DashboardPage: Fetched documents from DB:",
-              userDocuments
-            );
-            // Now, for each completed document, try to fetch its analysis
-            const enrichedDocuments: DashboardDocument[] = await Promise.all(
-              userDocuments.map(async (doc: DocumentFromDB) => {
-                let summary: string | null = null;
-                // let findings: string[] | null = null; // For later
-                let analysisErrorMessage: string | null = null;
-
-                if (doc.processing_status === "completed") {
-                  const { data: analysisData, error: analysisError } =
-                    await supabase
-                      .from("document_analyses")
-                      .select("summary_short, key_findings") // Add other fields as needed
-                      .eq("document_id", doc.id)
-                      .maybeSingle(); // Expect at most one analysis per document
-
-                  if (analysisError) {
-                    console.error(
-                      `DashboardPage: Error fetching analysis for doc ${doc.id}:`,
-                      analysisError
-                    );
-                    analysisErrorMessage = "Could not load analysis details.";
-                  }
-                  if (analysisData) {
-                    summary = analysisData.summary_short;
-                    // findings = analysisData.key_findings; // Process this if it's structured
-                  }
-                }
-
-                // Determine if polling is needed for this existing document
-                const needsPolling =
-                  doc.processing_status !== "completed" &&
-                  doc.processing_status !== "failed" &&
+          const enrichedDocuments: DashboardDocument[] = await Promise.all(
+            userDocuments.map(async (doc: any) => {
+              let summary: string | null = null;
+              if (doc.processing_status === "completed") {
+                const { data: analysisData } = await supabase
+                  .from("document_analyses")
+                  .select("summary_short, key_findings")
+                  .eq("document_id", doc.id)
+                  .maybeSingle();
+                summary = analysisData?.summary_short || null;
+              }
+              const needsPolling =
+                doc.processing_status !== "completed" &&
+                doc.processing_status !== "failed" &&
                   doc.processing_status !== "error" && // Custom client error state
                   doc.processing_status !== "timeout"; // Custom client timeout state
 
-                return {
-                  document_db_id: doc.id,
-                  original_file_name: doc.file_name,
-                  status: doc.processing_status || "unknown",
-                  summary_short: summary,
+              return {
+                document_db_id: doc.id,
+                original_file_name: doc.file_name,
+                status: doc.processing_status || "unknown",
+                summary_short: summary,
                   key_findings: null, // Populate this later
-                  error_message: doc.error_message || analysisErrorMessage,
-                  created_at: doc.created_at,
-                  isPolling: needsPolling,
-                  pollingAttempts: 0, // Start fresh for polling on load if needed
-                };
-              })
-            );
-            setDocuments(enrichedDocuments);
-            console.log(
-              "DashboardPage: Initial documents state set with enriched data:",
-              enrichedDocuments
-            );
-          } else {
-            setDocuments([]); // No documents found for the user
-          }
-        } catch (error) {
-          // Error already logged, state set by setInitialDocsError
-          console.error(
-            "DashboardPage: Catch all for fetchUserDocuments",
-            error
+                error_message: doc.error_message,
+                created_at: doc.created_at,
+                isPolling: needsPolling,
+                pollingAttempts: 0,
+              };
+            })
           );
+          setDocuments(enrichedDocuments);
+        } catch (error) {
+          setInitialDocsError("Failed to load your documents. Please try again.");
         } finally {
           setIsLoadingInitialDocs(false);
-          console.log("DashboardPage: Initial documents loading finished.");
         }
       };
-
       fetchUserDocuments();
-    } else if (!supabase && isLoadingInitialDocs) {
-      // Still waiting for supabase client to be available from context
-      console.log(
-        "DashboardPage: Supabase client not yet available, cannot fetch initial docs."
-      );
     }
-  }, [session, router, supabase, isLoadingInitialDocs]); // Removed 'documents' from here to avoid loop on setDocuments
+  }, [session, supabase, isLoadingInitialDocs]);
 
-  // --- Polling Logic (fetchAnalysisStatus, handleProcessingStart, polling useEffect) ---
-  // (This logic remains largely the same as the previous version)
+  // --- Polling logic for "processing" documents ---
   const fetchAnalysisStatus = useCallback(
     async (docDbId: string, originalFileName: string) => {
-      console.log(
-        `DashboardPage: fetchAnalysisStatus called for doc ID: ${docDbId} (${originalFileName})`
-      );
       try {
-        const backendUrl =
-          process.env.NEXT_PUBLIC_FASTAPI_BACKEND_URL ||
-          "http://127.0.0.1:8000";
-        const response = await fetch(
-          `${backendUrl}/analysis-status/${docDbId}`
-        );
-
-        if (!response.ok) {
-          console.error(
-            `DashboardPage: Error fetching status for ${docDbId}: ${response.status}`
-          );
-          const errorDetail =
-            response.status === 404
-              ? "Document not found on backend."
-              : `Server error ${response.status}`;
-          setDocuments((prevDocs) =>
-            prevDocs.map((d) =>
-              d.document_db_id === docDbId
-                ? {
-                    ...d,
-                    status: "error",
-                    error_message: errorDetail,
-                    isPolling: false,
-                  }
-                : d
-            )
-          );
-          return;
-        }
-
-        const result: AnalysisPollResult = await response.json(); // Use AnalysisPollResult type
-        result.original_file_name = originalFileName;
-        console.log(`DashboardPage: Received status for ${docDbId}:`, result);
-
+        const backendUrl = process.env.NEXT_PUBLIC_FASTAPI_BACKEND_URL || "http://127.0.0.1:8000";
+        const response = await fetch(`${backendUrl}/analysis-status/${docDbId}`);
+        if (!response.ok) return;
+        const result = await response.json();
         setDocuments((prevDocs) =>
           prevDocs.map((d) =>
             d.document_db_id === docDbId
               ? {
-                  ...d, // Spread existing doc to keep created_at etc.
-                  status: result.status, // Update status
-                  summary_short: result.summary_short, // Update summary
-                  key_findings: result.key_findings, // Update findings
-                  error_message: result.error_message, // Update error
+                  ...d,
+                  status: result.status,
+                  summary_short: result.summary_short,
+                  key_findings: result.key_findings,
+                  error_message: result.error_message,
                   isPolling:
-                    result.status !== "completed" &&
-                    result.status !== "failed" &&
-                    result.status !== "error",
+                    !["completed", "failed", "error", "timeout"].includes(result.status) &&
+                    (d.pollingAttempts || 0) < MAX_POLLING_ATTEMPTS,
                   pollingAttempts: (d.pollingAttempts || 0) + 1,
                 }
               : d
           )
         );
       } catch (error) {
-        console.error(
-          `DashboardPage: Polling fetch failed for ${docDbId}:`,
-          error
-        );
-        setDocuments((prevDocs) =>
-          prevDocs.map((d) =>
-            d.document_db_id === docDbId
-              ? {
-                  ...d,
-                  status: "error",
-                  error_message: "Polling network error.",
-                  isPolling: false,
-                }
-              : d
-          )
-        );
+        // Optionally handle error
       }
     },
     []
   );
 
-  const handleProcessingStart = (data: ProcessInitiationResponse) => {
-    console.log(
-      "DashboardPage: handleProcessingStart triggered with data:",
-      data
-    );
-
-    const newDocument: DashboardDocument = {
-      document_db_id: data.document_db_id,
-      original_file_name: data.file_name,
-      status: "uploaded", // Initial status from backend's perspective
-      summary_short: null,
-      key_findings: null,
-      error_message: null,
-      created_at: new Date().toISOString(), // Set current time for new uploads
-      isPolling: true,
-      pollingAttempts: 0,
-    };
-
-    setDocuments((prevDocs) => [newDocument, ...prevDocs]);
-    console.log(
-      "DashboardPage: New document added to state. Initiating first status fetch for:",
-      newDocument.document_db_id
-    );
-    fetchAnalysisStatus(data.document_db_id, data.file_name);
-  };
-
   useEffect(() => {
     const documentsToPoll = documents.filter(
       (doc) =>
         doc.isPolling &&
-        doc.status !== "completed" &&
-        doc.status !== "failed" &&
-        doc.status !== "error" &&
+        !["completed", "failed", "error", "timeout"].includes(doc.status) &&
         (doc.pollingAttempts || 0) < MAX_POLLING_ATTEMPTS
     );
 
-    if (documentsToPoll.length === 0) {
-      return;
-    }
+    if (documentsToPoll.length === 0) return;
 
-    console.log(
-      `DashboardPage: Polling useEffect - Setting up interval for ${documentsToPoll.length} document(s).`
-    );
     const intervalId = setInterval(() => {
-      const now = new Date().toLocaleTimeString();
-      // console.log(`DashboardPage: Polling interval fired at ${now}. Polling ${documentsToPoll.length} docs.`);
       documentsToPoll.forEach((doc) => {
-        // Fetch a fresh copy of the document from state within the interval to ensure conditions are current
-        const currentDocState = documents.find(
-          (d) => d.document_db_id === doc.document_db_id
-        );
-        if (
-          currentDocState &&
-          currentDocState.isPolling &&
-          currentDocState.status !== "completed" &&
-          currentDocState.status !== "failed" &&
-          currentDocState.status !== "error" &&
-          (currentDocState.pollingAttempts || 0) < MAX_POLLING_ATTEMPTS
-        ) {
-          // console.log(`DashboardPage: Interval - Fetching status for ${doc.document_db_id}`);
-          fetchAnalysisStatus(doc.document_db_id, doc.original_file_name!);
-        } else if (
-          currentDocState &&
-          currentDocState.isPolling &&
-          (currentDocState.pollingAttempts || 0) >= MAX_POLLING_ATTEMPTS
-        ) {
-          console.warn(
-            `DashboardPage: Interval - Max polling attempts reached for ${doc.document_db_id}. Stopping.`
-          );
-          setDocuments((prevDocs) =>
-            prevDocs.map((d) =>
-              d.document_db_id === doc.document_db_id
-                ? {
-                    ...d,
-                    isPolling: false,
-                    status: "timeout",
-                    error_message: "Polling timed out.",
-                  }
-                : d
-            )
-          );
-        }
+        fetchAnalysisStatus(doc.document_db_id, doc.original_file_name);
       });
     }, POLLING_INTERVAL);
 
-    return () => {
-      console.log("DashboardPage: Polling useEffect - Clearing interval.");
-      clearInterval(intervalId);
-    };
+    return () => clearInterval(intervalId);
   }, [documents, fetchAnalysisStatus]);
 
-  // --- Loading and Auth Checks ---
-  if (!supabase) {
-    console.log("DashboardPage: Render - Supabase client not ready.");
-    return (
-      <div className="flex justify-center items-center min-h-screen">
-        Initializing application...
-      </div>
-    );
-  }
-  if (!session && !isLoadingInitialDocs) {
-    console.log(
-      "DashboardPage: Render - No session, should be redirecting by effect."
-    );
-    return (
-      <div className="flex justify-center items-center min-h-screen">
-        Redirecting to login...
-      </div>
-    );
-  }
-  if (isLoadingInitialDocs) {
-    // Covers both !session && isLoading, and session && isLoading
-    console.log(
-      "DashboardPage: Render - Loading initial documents / checking session."
-    );
-    return (
-      <div className="flex justify-center items-center min-h-screen">
-        Loading dashboard data...
-      </div>
-    );
-  }
-  // If here: supabase and session are loaded, and initial docs loading is complete.
-
-  const getStatusColor = (status: string) => {
-    if (status === "completed")
-      return "text-green-700 bg-green-100 border-green-300";
-    if (status === "failed" || status === "error" || status === "timeout")
-      return "text-red-700 bg-red-100 border-red-300";
-    if (
-      status === "analyzing" ||
-      status === "parsing" ||
-      status === "uploaded" ||
-      status === "pending_upload"
-    )
-      return "text-blue-700 bg-blue-100 border-blue-300 animate-pulse";
-    return "text-gray-700 bg-gray-100 border-gray-300";
+  // Handler for processing start
+  const handleProcessingStart = (data: any) => {
+    const newDocument: DashboardDocument = {
+      document_db_id: data.document_db_id,
+      original_file_name: data.file_name,
+      status: "uploaded",
+      summary_short: null,
+      key_findings: null,
+      error_message: null,
+      created_at: new Date().toISOString(),
+      isPolling: true,
+      pollingAttempts: 0,
+    };
+    setDocuments((prevDocs) => [newDocument, ...prevDocs]);
   };
 
-  // --- Render JSX ---
+  // Quick actions: Rename
+  const handleRename = async (idx: number) => {
+    const doc = documents[idx];
+    if (!renameValue.trim()) return;
+    try {
+      setShowRenameModalIdx(null);
+      setNotification(null);
+      const backendUrl = process.env.NEXT_PUBLIC_FASTAPI_BACKEND_URL || "http://127.0.0.1:8000";
+      const res = await fetch(`${backendUrl}/rename-document/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: doc.document_db_id,
+          new_name: renameValue,
+          user_id: session?.user?.id,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to rename document");
+      setDocuments((prev) =>
+        prev.map((d, i) => (i === idx ? { ...d, original_file_name: renameValue } : d))
+      );
+      setNotification({ type: "success", message: "Document renamed!" });
+    } catch {
+      setNotification({ type: "error", message: "Rename failed." });
+    }
+  };
+
+  // Quick actions: Delete
+  const handleDelete = async (idx: number) => {
+    const doc = documents[idx];
+    setShowDeleteModalIdx(null);
+    try {
+      const backendUrl = process.env.NEXT_PUBLIC_FASTAPI_BACKEND_URL || "http://127.0.0.1:8000";
+      const res = await fetch(`${backendUrl}/delete-document/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: doc.document_db_id, user_id: session?.user.id }),
+      });
+      if (!res.ok) throw new Error("Failed to delete document");
+      setDocuments((prev) => prev.filter((_, i) => i !== idx));
+      setNotification({ type: "success", message: "Document deleted!" });
+    } catch {
+      setNotification({ type: "error", message: "Delete failed." });
+    }
+  };
+
+  // Notification Center (centered perfectly)
+  const NotificationCenter = () => (
+    <AnimatePresence>
+      {notification && (
+        <motion.div
+          initial={{ opacity: 0, y: -24 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -24 }}
+          className="fixed left-1/2 top-6 z-[9999] -translate-x-1/2 px-6 py-4 rounded-2xl shadow-xl font-medium
+            text-center text-white
+            bg-success"
+          style={{
+            background:
+              notification.type === "success"
+                ? "linear-gradient(90deg,#22c55e 0%,#16a34a 100%)"
+                : "linear-gradient(90deg,#ef4444 0%,#b91c1c 100%)",
+          }}
+        >
+          {notification.message}
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+
+  // --- Main render ---
   return (
-    <div className="container mx-auto p-4 md:p-8">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-10">
-        <h1 className="text-3xl md:text-4xl font-bold text-gray-800">
-          Your Dashboard
-        </h1>
-      </div>
+    <div className="relative min-h-screen flex flex-col">
+      {/* Gradient background for dashboard */}
+      <div
+        className="absolute inset-0 -z-10 bg-hero-gradient dark:bg-hero-gradient-dark"
+        aria-hidden="true"
+        style={{
+          background:
+            "radial-gradient(circle at 60% 42%, var(--gradient-hero-start, #eceafe) 0%, var(--gradient-hero-end, #7549b3) 100%)",
+        }}
+      />
+      <div
+        className="absolute inset-0 -z-10 pointer-events-none dark:block hidden"
+        aria-hidden="true"
+        style={{
+          background:
+            "radial-gradient(circle at 60% 42%, var(--gradient-hero-start-dark, #2c256f) 0%, var(--gradient-hero-end-dark, #10111a) 100%)",
+        }}
+      />
 
-      <div className="mb-12">
-        <PdfUploader onProcessingStart={handleProcessingStart} />
-      </div>
-
-      {initialDocsError && (
-        <div className="my-6 p-4 text-red-700 bg-red-100 border border-red-300 rounded-lg">
-          <strong>Error loading documents:</strong> {initialDocsError}
+      <div className="container mx-auto p-4 md:p-8 flex-1 w-full">
+        <NotificationCenter />
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-10">
+          <h1 className="text-3xl md:text-4xl font-bold text-text-primary">Your Dashboard</h1>
         </div>
-      )}
-
-      {documents.length > 0 && (
-        <div className="mt-12">
-          <h2 className="text-2xl font-semibold text-gray-700 mb-6">
-            My Documents
-          </h2>
-          <div className="space-y-6">
-            {documents.map((doc) => (
-              <Link
-                href={`/dashboard/document/${doc.document_db_id}`}
-                key={doc.document_db_id}
-                className="block bg-white p-6 rounded-xl shadow-lg border border-gray-200 hover:shadow-2xl hover:border-indigo-300 transition-all duration-300 ease-in-out cursor-pointer"
-              >
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3">
-                  <h3
-                    className="text-xl font-semibold text-indigo-700 mb-2 sm:mb-0 truncate"
-                    title={doc.original_file_name || doc.document_db_id}
-                  >
-                    {doc.original_file_name || doc.document_db_id}
-                  </h3>
-                  <span
-                    className={`px-3 py-1 text-xs font-bold rounded-full border ${getStatusColor(
-                      doc.status
-                    )}`}
-                  >
-                    {doc.status
-                      .replace(/_/g, " ")
-                      .replace(/\b\w/g, (l) => l.toUpperCase())}
-                    {doc.isPolling &&
-                      doc.status !== "completed" &&
-                      doc.status !== "failed" &&
-                      doc.status !== "error" &&
-                      doc.status !== "timeout" &&
-                      "..."}
-                  </span>
-                </div>
-                {doc.created_at && (
-                  <p className="text-xs text-gray-500 mb-2">
-                    Uploaded: {new Date(doc.created_at).toLocaleString()}
-                  </p>
-                )}
-
-                {doc.status === "completed" && doc.summary_short && (
-                  <div className="mt-4">
-                    <h4 className="text-sm font-semibold text-gray-500 mb-1 uppercase tracking-wider">
-                      Summary:
-                    </h4>
-                    <p className="text-sm text-gray-800 bg-indigo-50 p-4 rounded-md max-h-48 overflow-y-auto leading-relaxed prose prose-sm">
-                      {doc.summary_short}
-                    </p>
-                  </div>
-                )}
-
-                {doc.error_message && (
-                  <div className="mt-3 text-sm text-red-800 bg-red-100 p-3 rounded-md border border-red-200">
-                    <strong>Error:</strong> {doc.error_message}
-                  </div>
-                )}
-
-                {doc.status !== "completed" &&
-                  doc.status !== "failed" &&
-                  doc.status !== "error" &&
-                  doc.status !== "timeout" &&
-                  !doc.isPolling &&
-                  doc.document_db_id && (
-                    <button
-                      onClick={() => {
-                        console.log(
-                          `DashboardPage: Manually refreshing status for ${doc.document_db_id}`
-                        );
-                        setDocuments((prev) =>
-                          prev.map((d) =>
-                            d.document_db_id === doc.document_db_id
-                              ? {
-                                  ...d,
-                                  isPolling: true,
-                                  pollingAttempts: 0,
-                                  status: "refreshing",
-                                }
-                              : d
-                          )
-                        );
-                        fetchAnalysisStatus(
-                          doc.document_db_id,
-                          doc.original_file_name!
-                        );
-                      }}
-                      className="mt-4 text-xs text-indigo-600 hover:text-indigo-800 font-medium py-1 px-3 border border-indigo-300 rounded-md hover:bg-indigo-50 transition-colors"
-                    >
-                      Refresh Status
-                    </button>
-                  )}
-                <div className="mt-4 text-right">
-                  <span className="text-xs text-indigo-500 hover:text-indigo-700 font-semibold">
-                    View Details & Chat →
-                  </span>
-                </div>
-              </Link>
-            ))}
+        <div className="mb-12">
+          <PdfUploader onProcessingStart={handleProcessingStart} />
+        </div>
+        {initialDocsError && (
+          <div className="my-6 p-4 text-error bg-error/10 border border-error/30 rounded-lg">
+            <strong>Error loading documents:</strong> {initialDocsError}
           </div>
-        </div>
-      )}
-      {documents.length === 0 && !isLoadingInitialDocs && !initialDocsError && (
-        <div className="text-center text-gray-500 mt-12 py-16 border-2 border-dashed border-gray-300 rounded-xl bg-white shadow">
-          <svg
-            className="mx-auto h-16 w-16 text-gray-400"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="1.5"
-              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-            />
-          </svg>
-          <h3 className="mt-4 text-lg font-medium text-gray-800">
-            No documents uploaded yet
-          </h3>
-          <p className="mt-2 text-sm text-gray-600">
-            Get started by uploading a PDF for analysis using the form above.
-          </p>
-        </div>
-      )}
+        )}
+
+        {/* Modals for Rename/Delete */}
+        <AnimatePresence>
+          {showRenameModalIdx !== null && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[999] bg-black/60 flex items-center justify-center"
+            >
+              <motion.div
+                initial={{ scale: 0.97 }}
+                animate={{ scale: 1 }}
+                exit={{ scale: 0.97 }}
+                className="bg-surface rounded-3xl p-8 shadow-2xl w-full max-w-sm"
+              >
+                <h2 className="font-bold text-xl mb-4">Rename Document</h2>
+                <input
+                  className="w-full p-3 rounded-xl border border-text-secondary/20 bg-surface-alt text-text-primary mb-4"
+                  value={renameValue}
+                  onChange={e => setRenameValue(e.target.value)}
+                  placeholder="New document name"
+                />
+                <div className="flex gap-4 justify-end">
+                  <Button variant="secondary" onClick={() => setShowRenameModalIdx(null)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={() => handleRename(showRenameModalIdx!)}>Save</Button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+          {showDeleteModalIdx !== null && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[999] bg-black/60 flex items-center justify-center"
+            >
+              <motion.div
+                initial={{ scale: 0.97 }}
+                animate={{ scale: 1 }}
+                exit={{ scale: 0.97 }}
+                className="bg-surface rounded-3xl p-8 shadow-2xl w-full max-w-sm"
+              >
+                <h2 className="font-bold text-xl mb-4">Delete Document</h2>
+                <p className="mb-4 text-text-secondary">Are you sure you want to delete this document?</p>
+                <div className="flex gap-4 justify-end">
+                  <Button variant="secondary" onClick={() => setShowDeleteModalIdx(null)}>
+                    Cancel
+                  </Button>
+                  <Button variant="danger" onClick={() => handleDelete(showDeleteModalIdx!)}>Delete</Button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Cards in 2 columns on md+, 1 column on small */}
+        {documents.length > 0 && (
+          <div className="mt-12">
+            <h2 className="text-2xl font-semibold text-text-primary mb-6">
+              My Documents
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {documents.map((doc, idx) => (
+                <motion.div
+                  key={doc.document_db_id}
+                  initial={{ opacity: 0, y: 24 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.04 * idx, duration: 0.33, type: "spring" }}
+                  className="relative bg-gradient-to-br from-surface via-surface-alt to-surface-alt rounded-2xl shadow-xl border border-surface-alt hover:shadow-2xl hover:border-accent-primary transition-all duration-300 cursor-pointer
+                  flex flex-col min-h-[220px]"
+                >
+                  {/* Actions menu */}
+                  <div className="absolute right-4 top-4 z-10">
+                    <div className="relative">
+                      <button
+                        className="p-2 rounded-full hover:bg-accent-primary/10 transition"
+                        onClick={e => {
+                          e.stopPropagation();
+                          setShowActionsIdx(idx === showActionsIdx ? null : idx);
+                        }}
+                        aria-label="Document actions"
+                      >
+                        <MoreVertical size={20} />
+                      </button>
+                      <AnimatePresence>
+                        {showActionsIdx === idx && (
+                          <motion.div
+                            initial={{ opacity: 0, scale: 0.97, y: 8 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.97, y: 8 }}
+                            className="absolute right-0 mt-2 bg-surface-alt rounded-xl shadow-lg border border-text-secondary/10 min-w-[140px] py-1 z-20"
+                          >
+                            <button
+                              className="flex items-center gap-2 w-full px-4 py-2 text-sm hover:bg-accent-primary/10 transition text-text-primary"
+                              onClick={e => {
+                                e.stopPropagation();
+                                setShowRenameModalIdx(idx);
+                                setRenameValue(doc.original_file_name);
+                                setShowActionsIdx(null);
+                              }}
+                            >
+                              <Pencil size={15} /> Rename
+                            </button>
+                            <button
+                              className="flex items-center gap-2 w-full px-4 py-2 text-sm hover:bg-error/10 transition text-error"
+                              onClick={e => {
+                                e.stopPropagation();
+                                setShowDeleteModalIdx(idx);
+                                setShowActionsIdx(null);
+                              }}
+                            >
+                              <Trash size={15} /> Delete
+                            </button>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  </div>
+                  {/* Card body */}
+                  <Link
+                    href={`/dashboard/document/${doc.document_db_id}`}
+                    className="block p-6 pt-12 h-full"
+                  >
+                    <div className="flex flex-col h-full">
+                      <h3
+                        className="text-xl font-semibold text-accent-primary truncate"
+                        title={doc.original_file_name || doc.document_db_id}
+                      >
+                        {doc.original_file_name || doc.document_db_id}
+                      </h3>
+                      <p className="text-xs text-text-secondary mb-1">
+                        Uploaded: {doc.created_at ? new Date(doc.created_at).toLocaleString() : "N/A"}
+                      </p>
+                      <span
+                        className={`mt-1 px-3 py-1 text-xs font-bold rounded-full border w-fit
+                          ${
+                            doc.status === "completed"
+                              ? "text-success bg-success/10 border-success/40"
+                              : doc.status === "failed" || doc.status === "error" || doc.status === "timeout"
+                              ? "text-error bg-error/10 border-error/40"
+                              : "text-accent-primary bg-accent-primary/10 border-accent-primary/20 animate-pulse"
+                          }`}
+                      >
+                        {doc.status.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}
+                        {doc.isPolling && !["completed", "failed", "error", "timeout"].includes(doc.status) && "..."}
+                      </span>
+                      {doc.summary_short && (
+                        <div className="mt-4 max-h-[120px] overflow-y-auto custom-scrollbar text-sm text-text-primary leading-relaxed prose prose-invert bg-surface-alt p-2 rounded-lg">
+                          {doc.summary_short}
+                        </div>
+                      )}
+                      {doc.error_message && (
+                        <div className="mt-3 text-sm text-error bg-error/10 p-3 rounded-md border border-error/30">
+                          <strong>Error:</strong> {doc.error_message}
+                        </div>
+                      )}
+                      <div className="mt-3 text-right">
+                        <span className="text-xs text-accent-primary hover:text-accent-secondary font-semibold">
+                          View Details & Chat →
+                        </span>
+                      </div>
+                    </div>
+                  </Link>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        )}
+        {documents.length === 0 && !isLoadingInitialDocs && !initialDocsError && (
+          <div className="text-center text-text-secondary mt-12 py-16 border-2 border-dashed border-surface-alt rounded-xl bg-surface shadow">
+            <svg
+              className="mx-auto h-16 w-16 text-accent-primary/20"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="1.5"
+                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+              />
+            </svg>
+            <h3 className="mt-4 text-lg font-medium text-text-primary">
+              No documents uploaded yet
+            </h3>
+            <p className="mt-2 text-sm text-text-secondary">
+              Get started by uploading a PDF for analysis using the form above.
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

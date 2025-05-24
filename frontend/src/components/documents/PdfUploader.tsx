@@ -3,6 +3,7 @@
 import React, { useState, ChangeEvent, FormEvent } from 'react';
 import { useSupabase } from '@/app/supabase-provider';
 import { Session } from '@supabase/supabase-js';
+import { motion } from 'framer-motion';
 
 interface ProcessInitiationResponse {
   document_db_id: string;
@@ -137,19 +138,25 @@ export default function PdfUploader({ onProcessingStart }: PdfUploaderProps) {
   };
 
   return (
-    <div className="w-full max-w-lg p-6 mx-auto bg-white rounded-xl shadow-xl">
-      <h2 className="text-2xl font-semibold text-center text-gray-800 mb-6">Upload PDF for Analysis</h2>
-      
+    <motion.div
+      initial={{ opacity: 0, y: 30 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+      className="w-full max-w-lg p-6 mx-auto bg-surface rounded-xl shadow-xl border border-black/10 dark:border-white/10"
+    >
+      <h2 className="text-2xl font-semibold text-center text-text-primary mb-6">
+        Upload PDF for Analysis
+      </h2>
+
       <form onSubmit={handleSubmit} onDragEnter={handleDrag} className="space-y-6">
-        <div 
-          className={`p-6 border-2 ${dragActive ? 'border-indigo-600 bg-indigo-50' : 'border-dashed border-gray-300'} rounded-lg text-center cursor-pointer transition-colors duration-200 ease-in-out`}
+        <div
+          className={`p-6 border-2 ${
+            dragActive ? "border-accent-primary bg-accent-primary/10" : "border-dashed border-black/10 dark:border-white/10"
+          } rounded-lg text-center cursor-pointer transition-colors duration-200 ease-in-out`}
           onDragLeave={handleDrag}
           onDragOver={handleDrag}
           onDrop={handleDrop}
-          onClick={() => {
-            console.log("PdfUploader: Upload area clicked.");
-            document.getElementById('pdf-upload-input')?.click();
-          }}
+          onClick={() => document.getElementById("pdf-upload-input")?.click()}
         >
           <input
             type="file"
@@ -158,29 +165,32 @@ export default function PdfUploader({ onProcessingStart }: PdfUploaderProps) {
             onChange={handleFileChange}
             className="hidden"
           />
-          <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
+          <svg className="mx-auto h-12 w-12 text-accent-primary" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
             <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
-          <p className="mt-2 text-sm text-gray-600">
+          <p className="mt-2 text-sm text-text-secondary">
             {dragActive ? "Drop the PDF here..." : "Drag & drop a PDF file here, or click to select"}
           </p>
-          <p className="text-xs text-gray-500">PDF up to 10MB (example limit)</p>
         </div>
 
         {selectedFile && (
-          <div className="text-sm text-gray-700">
-            <p>Selected file: <span className="font-semibold">{selectedFile.name}</span> ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)</p>
+          <div className="text-sm text-text-primary">
+            <p>
+              Selected file: <span className="font-semibold">{selectedFile.name}</span> ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
+            </p>
           </div>
         )}
 
         {error && (
-          <p className="text-sm text-red-600 bg-red-100 p-3 rounded-md">{error}</p>
+          <p className="text-sm text-red-500 bg-red-800/10 p-3 rounded-md">{error}</p>
         )}
 
-        <button
-          type="submit" // Keep type="submit" to trigger form's onSubmit
+        <motion.button
+          type="submit"
           disabled={isUploading || !selectedFile}
-          className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors duration-200 ease-in-out"
+          whileHover={{ scale: 1.03 }}
+          whileTap={{ scale: 0.98 }}
+          className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-md text-sm font-medium bg-accent-primary text-white hover:bg-accent-secondary focus:outline-none focus:ring-2 focus:ring-accent-primary transition-all disabled:bg-black/20 disabled:cursor-not-allowed"
         >
           {isUploading ? (
             <>
@@ -193,8 +203,8 @@ export default function PdfUploader({ onProcessingStart }: PdfUploaderProps) {
           ) : (
             "Upload & Analyze PDF"
           )}
-        </button>
+        </motion.button>
       </form>
-    </div>
+    </motion.div>
   );
 }

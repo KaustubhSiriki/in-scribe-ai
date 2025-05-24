@@ -13,7 +13,8 @@ from fastapi import (
     HTTPException,
     BackgroundTasks,
     Form,
-    Response
+    Response,
+    Request,
 )
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
@@ -414,3 +415,36 @@ async def query_document(document_db_id: str, query: DocumentQuery):
         answer=answer,
         relevant_chunks_preview=[c["chunk_text"][:100] + "..." for c in chunks],
     )
+
+@app.post("/rename-document/")
+async def rename_document(request: Request):
+    body = await request.json()
+    doc_id = body.get("id")
+    new_name = body.get("new_name")
+    user_id = body.get("user_id")  # Frontend sends session user id
+
+    if not (doc_id and new_name and user_id):
+        raise HTTPException(400, "id, new_name, and user_id are required.")
+
+    supabase = get_supabase_admin_client()
+    res = supabase.table("documents").update({"file_name": new_name})\
+                  .eq("id", doc_id).eq("user_id", user_id).execute()
+    handle_supabase_response(res, "rename_document")
+    return {"success": True, "new_name": new_name}
+
+@app.post("/delete-document/")
+async def delete_document(request: Request):
+    body = await request.json()
+    doc_id = body.get("id")
+    user_id = body.get("user_id")
+
+    if not (doc_id and user_id):
+        raise HTTPException(400, "id and user_id are required.")
+
+    supabase = get_supabase_admin_client()
+    # Remove document and related analysis/chunks
+    supabase.table("document_analyses").delete().eq("document_id", doc_id).eq("user_id", user_id).execute()
+    supabase.table("document_chunks").delete().eq("document_id", doc_id).eq("user_id", user_id).execute()
+    res = supabase.table("documents").delete().eq("id", doc_id).eq("user_id", user_id).execute()
+    handle_supabase_response(res, "delete_document")
+    return {"success": True}

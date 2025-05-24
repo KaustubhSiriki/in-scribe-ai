@@ -1,5 +1,4 @@
-"use client";
-
+'use client';
 import { useEffect } from 'react';
 import { Auth } from '@supabase/auth-ui-react';
 import { ThemeSupa } from '@supabase/auth-ui-shared';
@@ -13,7 +12,7 @@ export default function AuthPage() {
 
   useEffect(() => {
     if (session) {
-      router.push('/dashboard'); 
+      router.push('/dashboard');
     }
   }, [session, router]);
 
@@ -24,13 +23,11 @@ export default function AuthPage() {
   
 
   return (
-    <div className="flex justify-center items-center min-h-screen bg-gray-100">
-      <div className="w-full max-w-md p-8 space-y-8 bg-white rounded-lg shadow-xl">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Sign in to InScribe AI
-          </h2>
-        </div>
+    <div className='flex justify-center items-center min-h-screen bg-background'>
+      <div className='w-full max-w-md p-8 space-y-8 bg-surface rounded-lg shadow-xl border border-black/5 dark:border-white/10'>
+        <h2 className='mt-6 text-center text-3xl font-extrabold text-text-primary'>
+          Sign in to InScribe AI
+        </h2>
         {/* 
           The Auth component handles various authentication flows.
           - supabaseClient: The Supabase client instance.
@@ -42,13 +39,15 @@ export default function AuthPage() {
         */}
         <Auth
           supabaseClient={supabase}
-          appearance={{ 
+          appearance={{
             theme: ThemeSupa,
             variables: {
               default: {
                 colors: {
                   brand: 'hsl(252 75% 60%)',
                   brandAccent: 'hsl(252 85% 65%)',
+                  inputBorder: 'hsl(252 75% 60%)',
+                  inputText: 'var(--color-text-primary)',
                 },
               },
             },
@@ -66,7 +65,7 @@ export default function AuthPage() {
               }
             }
           }}
-          theme="light" // Or "dark"
+          theme='dark'
         />
       </div>
     </div>

@@ -2,3 +2,94 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --color-background: #f8f9fb;
+  --color-surface: #fff;
+  --color-surface-alt: #f1f3f9;
+  --color-text-primary: #111325;
+  --color-text-secondary: #586078;
+  --color-accent-primary: #7c3aed;
+  --color-accent-secondary: #6366f1;
+  --color-success: #22c55e;
+  --color-error: #ef4444;
+  --scrollbar-thumb: #d1d5db;
+  --scrollbar-track: #f1f3f9;
+  --gradient-hero-start: #eceafe;
+  --gradient-hero-end: #7549b3;
+}
+.dark {
+  --color-background: #10111a;
+  --color-surface: #181a24;
+  --color-surface-alt: #20222e;
+  --color-text-primary: #e9eaff;
+  --color-text-secondary: #b3b6ca;
+  --color-accent-primary: #a78bfa;
+  --color-accent-secondary: #6366f1;
+  --color-success: #22c55e;
+  --color-error: #ef4444;
+  --scrollbar-thumb: #5b5f67;
+  --scrollbar-track: #181a24;
+  --gradient-hero-start-dark: #2c256f;
+  --gradient-hero-end-dark: #10111a;
+}
+
+html {
+  scrollbar-color: var(--color-text-secondary) #181a24;
+  scrollbar-width: thin;
+}
+body {
+  background: var(--color-background);
+  color: var(--color-text-primary);
+  transition: background 0.18s, color 0.18s;
+}
+
+/* Custom Scrollbars: all browsers */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-text-secondary) #181a24;
+}
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-accent-primary);
+  border-radius: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #181a24;
+  border-radius: 6px;
+}
+
+@media (max-width: 640px) {
+  ::-webkit-scrollbar {
+    width: 0px;
+    height: 0px;
+  }
+}
+
+.prose,
+.prose-invert {
+  color: var(--color-text-primary);
+  max-width: 100%;
+}
+
+.bg-hero-gradient {
+  background: var(--gradient-hero);
+}
+.bg-surface-gradient {
+  background: var(--gradient-surface);
+}
+
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-text-secondary) var(--color-surface);
+}
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  background: var(--color-text-secondary);
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--color-text-secondary);
+  border-radius: 10px;
+}
