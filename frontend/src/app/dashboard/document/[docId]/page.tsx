@@ -404,7 +404,8 @@ export default function DocumentDetailPage() {
                   <div className="prose prose-invert max-w-none mb-6 bg-surface-alt rounded-2xl p-4 custom-scrollbar flex-1"
                     style={{
                       overflowY: "auto",
-                      minHeight: "200px",
+                      minHeight: "300px",
+                      maxHeight: "520px",
                     }}>
                     <h2 className="text-base font-semibold text-text-primary mb-2">Summary</h2>
                     <p className="text-text-primary">{documentDetails.summary_short}</p>
@@ -431,7 +432,7 @@ export default function DocumentDetailPage() {
                 style={{
                   boxShadow:
                     "0 4px 32px 0 rgba(80,80,180,0.12), 0 1.5px 4px 0 rgba(20,20,70,0.02)",
-                  minHeight: "500px",
+                  minHeight: "400px", maxHeight: "700px",
                 }}
               >
                 <h2 className="text-xl font-semibold mb-4 text-text-primary">Chat with this Document</h2>
@@ -440,7 +441,7 @@ export default function DocumentDetailPage() {
                 <div
                   ref={chatContainerRef}
                   className="flex-1 overflow-y-auto custom-scrollbar mb-4 prose prose-invert"
-                  style={{ minHeight: "300px", maxHeight: "400px" }}
+                  style={{ minHeight: "300px", maxHeight: "600px" }}
                 >
                   {chatMessages.length === 0 && <EmptyChatSVG />}
                   {chatMessages.map((msg) => (

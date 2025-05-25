@@ -43,7 +43,7 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 app = FastAPI(title="InScribe AI Backend Processing Service")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:5173"],  # dev ports for React and Vite
+    allow_origins=["http://localhost:3000", "http://localhost:5173", "https://in-scribe-j9fwbzc3o-kaustubhsirikis-projects.vercel.app", "https://in-scribe-ai.vercel.app/", "https://in-scribe-ai-kaustubhsirikis-projects.vercel.app/", "https://in-scribe-ai-git-main-kaustubhsirikis-projects.vercel.app/"],  # dev ports for React and Vite
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
