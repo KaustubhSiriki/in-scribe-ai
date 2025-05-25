@@ -43,7 +43,7 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 app = FastAPI(title="InScribe AI Backend Processing Service")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:5173", "https://in-scribe-j9fwbzc3o-kaustubhsirikis-projects.vercel.app", "https://in-scribe-ai.vercel.app/", "https://in-scribe-ai-kaustubhsirikis-projects.vercel.app/", "https://in-scribe-ai-git-main-kaustubhsirikis-projects.vercel.app/"],  # dev ports for React and Vite
+    allow_origins=["http://localhost:3000", "http://localhost:5173", "https://in-scribe-j9fwbzc3o-kaustubhsirikis-projects.vercel.app", "https://in-scribe-ai.vercel.app", "https://in-scribe-ai-kaustubhsirikis-projects.vercel.app", "https://in-scribe-ai-git-main-kaustubhsirikis-projects.vercel.app"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -289,6 +289,13 @@ async def process_document_and_store_analysis(
 # ------------------------
 # API Endpoints
 # ------------------------
+
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    print(f"Incoming: {request.method} {request.url} Headers: {request.headers}")
+    return await call_next(request)
+
 
 @app.post("/upload-and-process-pdf/", response_model=ProcessInitiationResponse)
 async def upload_and_process_pdf(
